@@ -1,0 +1,30 @@
+package eventhandlers
+
+import (
+	"context"
+	"log/slog"
+
+	ddd "{{.Kit}}/domain"
+
+	{{.Extra.ProviderAlias}} "{{.Extra.ProviderContract}}"
+)
+
+// {{.Name}} makes the {{.Mod.Human}} module react to {{.Extra.Provider}}.{{.Extra.Event}}.
+//
+// Delivery is at-least-once (outbox + retries): the handler must be idempotent, e.g.
+// skip events whose e.ID was already processed. Keep it fast; do heavy work with commands.
+type {{.Name}} struct {
+	log *slog.Logger
+}
+
+// New{{.Name}} builds the handler. Add the repositories/ports it needs as parameters.
+func New{{.Name}}(log *slog.Logger) *{{.Name}} {
+	return &{{.Name}}{log: log}
+}
+
+// Handle processes one event.
+func (h *{{.Name}}) Handle(ctx context.Context, e ddd.Event, p {{.Extra.ProviderAlias}}.{{.Extra.Event}}) error {
+	h.log.InfoContext(ctx, "received {{.Extra.Provider}}.{{.Extra.Event}}", slog.String("event_id", e.ID))
+	_ = p // TODO: react to the event
+	return nil
+}

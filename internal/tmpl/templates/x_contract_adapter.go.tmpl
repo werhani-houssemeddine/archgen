@@ -1,0 +1,43 @@
+package {{.Mod.Pkg}}
+
+import (
+	"context"
+
+	"{{.Kit}}/errs"
+
+	"{{.ModuleImport .Mod.Pkg "contract"}}"
+	"{{.ModuleImport .Mod.Pkg "domain"}}"
+)
+{{if .Res.Name}}
+// {{.Extra.Adapter}} implements contract.{{.Name}} on top of the module's repository.
+type {{.Extra.Adapter}} struct {
+	repo domain.{{.Res.Name}}Repository
+}
+
+var _ contract.{{.Name}} = {{.Extra.Adapter}}{}
+
+// Get{{.Res.Name}} implements contract.{{.Name}}.
+func (a {{.Extra.Adapter}}) Get{{.Res.Name}}(ctx context.Context, id string) (contract.{{.Res.Name}}Info, error) {
+	{{.Res.Camel}}, err := a.repo.Get(ctx, id)
+	if err != nil {
+		return contract.{{.Res.Name}}Info{}, err
+	}
+	s := {{.Res.Camel}}.Snapshot()
+	return contract.{{.Res.Name}}Info{
+		ID: s.ID,
+{{- range .Res.Fields}}
+		{{.Name}}: s.{{.Name}},
+{{- end}}
+	}, nil
+}
+{{else}}
+// {{.Extra.Adapter}} implements contract.{{.Name}}.
+type {{.Extra.Adapter}} struct{}
+
+var _ contract.{{.Name}} = {{.Extra.Adapter}}{}
+
+// Ping implements contract.{{.Name}}.
+func (a {{.Extra.Adapter}}) Ping(ctx context.Context) error {
+	return errs.Internalf("contract.{{.Name}} is not implemented yet")
+}
+{{end}}

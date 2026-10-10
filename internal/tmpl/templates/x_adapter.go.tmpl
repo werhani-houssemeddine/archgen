@@ -1,0 +1,23 @@
+package {{.Extra.AdapterPkg}}
+
+import (
+	"context"
+
+	"{{.Kit}}/errs"
+
+	"{{.ModuleImport .Mod.Pkg "application" "ports"}}"
+)
+
+// {{.Name}} implements ports.{{.Name}}. Inject its configuration and clients through
+// the constructor; never read the environment here.
+type {{.Name}} struct{}
+
+var _ ports.{{.Name}} = (*{{.Name}})(nil)
+
+// New{{.Name}} builds the adapter.
+func New{{.Name}}() *{{.Name}} { return &{{.Name}}{} }
+
+// Execute implements ports.{{.Name}}.
+func (a *{{.Name}}) Execute(ctx context.Context) error {
+	return errs.Internalf("{{.Name}} adapter is not implemented yet")
+}

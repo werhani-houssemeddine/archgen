@@ -1,0 +1,11 @@
+package ports
+
+import "context"
+
+// {{.Name}} is a port: an operation the {{.Mod.Human}} use cases need from the outside
+// world. The application owns this interface; infrastructure implements it.
+// Keep it small and expressed in business terms.
+type {{.Name}} interface {
+	// Replace with the operations your use cases need.
+	Execute(ctx context.Context) error
+}

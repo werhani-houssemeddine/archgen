@@ -1,0 +1,50 @@
+package queries
+
+import (
+	"context"
+	"time"
+
+	"{{.Kit}}/cqrs"
+	"{{.Kit}}/errs"
+	"{{.Kit}}/validate"
+)
+
+// {{.Name}} is a read use case of the {{.Mod.Human}} module.
+type {{.Name}} struct {
+	cqrs.Query
+{{- range .Fields}}
+	{{.Name}} {{.GoType}}
+{{- end}}
+}
+
+// Permissions required to execute the query.
+func ({{.Name}}) Permissions() []string { return []string{"{{.Mod.Snake}}:read"} }
+
+// Validate checks the query input.
+func (q {{.Name}}) Validate() error {
+	v := validate.New()
+{{- range .Fields}}{{with .ValidateLine (printf "q.%s" .Name)}}
+	{{.}}{{end}}{{end}}
+	return v.Err()
+}
+
+// {{.Name}}Result is the read model returned by {{.Name}}.
+type {{.Name}}Result struct {
+	// Add the fields the caller needs.
+}
+
+// {{.Name}}Handler handles {{.Name}}. Add the repositories / read stores it needs.
+type {{.Name}}Handler struct{}
+
+// New{{.Name}}Handler builds the handler.
+func New{{.Name}}Handler() *{{.Name}}Handler { return &{{.Name}}Handler{} }
+
+// Handle executes the query.
+func (h *{{.Name}}Handler) Handle(ctx context.Context, q {{.Name}}) ({{.Name}}Result, error) {
+	return {{.Name}}Result{}, errs.Internalf("{{.Name}} is not implemented yet")
+}
+
+// Register{{.Name}} registers the handler on the mediator.
+func Register{{.Name}}(m *cqrs.Mediator) {
+	cqrs.Handle(m, New{{.Name}}Handler().Handle)
+}

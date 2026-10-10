@@ -1,0 +1,45 @@
+package commands
+
+import (
+	"context"
+	"time"
+
+	"{{.Kit}}/cqrs"
+	"{{.Kit}}/errs"
+	"{{.Kit}}/validate"
+)
+
+// {{.Name}} is a write use case of the {{.Mod.Human}} module.
+type {{.Name}} struct {
+{{- range .Fields}}
+	{{.Name}} {{.GoType}}
+{{- end}}
+}
+
+// Permissions required to execute the command (enforced by the mediator).
+func ({{.Name}}) Permissions() []string { return []string{"{{.Mod.Snake}}:{{.NameSnake}}"} }
+
+// Validate checks the command input (business rules belong to the domain).
+func (c {{.Name}}) Validate() error {
+	v := validate.New()
+{{- range .Fields}}{{with .ValidateLine (printf "c.%s" .Name)}}
+	{{.}}{{end}}{{end}}
+	return v.Err()
+}
+
+// {{.Name}}Handler handles {{.Name}}. Add the repositories and ports it needs as fields.
+type {{.Name}}Handler struct{}
+
+// New{{.Name}}Handler builds the handler.
+func New{{.Name}}Handler() *{{.Name}}Handler { return &{{.Name}}Handler{} }
+
+// Handle executes the use case: load the aggregate, call a domain method, save it.
+func (h *{{.Name}}Handler) Handle(ctx context.Context, cmd {{.Name}}) (struct{}, error) {
+	return struct{}{}, errs.Internalf("{{.Name}} is not implemented yet")
+}
+
+// Register{{.Name}} registers the handler on the mediator.
+func Register{{.Name}}(m *cqrs.Mediator) {
+	cqrs.Handle(m, New{{.Name}}Handler().Handle)
+}
+

@@ -1,0 +1,19 @@
+package domain
+
+import (
+	"time"
+
+	ddd "{{.Kit}}/domain"
+)
+
+// {{.Name}} is a domain event of the {{.Mod.Human}} module (internal: not visible to
+// other modules). Record it from an aggregate method: agg.Record({{.Name}}Event.New(ctx, {{.Name}}{...})).
+type {{.Name}} struct {
+{{- range .Fields}}
+	{{.Name}} {{.GoType}} `json:"{{.JSON}}{{if .Optional}},omitempty{{end}}"`
+{{- end}}
+}
+
+// {{.Name}}Event declares the event type (versioned: bump .v1 when the payload changes incompatibly).
+var {{.Name}}Event = ddd.DefineEvent[{{.Name}}]("{{.Mod.Snake}}.{{.NameSnake}}.v1")
+

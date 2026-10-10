@@ -1,0 +1,30 @@
+package contract
+
+import (
+	"context"
+	"time"
+)
+{{if .Res.Name}}
+// {{.Res.Name}}Info is the public view of a {{.Res.Human}} exposed to other modules.
+// It is a contract: never expose domain types, and avoid removing fields.
+type {{.Res.Name}}Info struct {
+	ID string `json:"id"`
+{{- range .Res.Fields}}
+	{{.Name}} {{.GoType}} `json:"{{.JSON}}{{if .Optional}},omitempty{{end}}"`
+{{- end}}
+}
+
+// {{.Name}} is the public read API of the {{.Mod.Human}} module for {{.Res.PluralHuman}}.
+type {{.Name}} interface {
+	// Get{{.Res.Name}} returns an errs.KindNotFound error when the {{.Res.Human}} does not exist.
+	Get{{.Res.Name}}(ctx context.Context, id string) ({{.Res.Name}}Info, error)
+}
+{{else}}
+// {{.Name}} is part of the public API of the {{.Mod.Human}} module.
+// Declare only what other modules need (small interfaces).
+type {{.Name}} interface {
+	// Replace with the operations other modules need, e.g.
+	// Exists(ctx context.Context, id string) (bool, error)
+	Ping(ctx context.Context) error
+}
+{{end}}

@@ -1,0 +1,25 @@
+package contract
+
+import (
+	"time"
+
+	ddd "{{.Kit}}/domain"
+)
+
+// {{.Name}} is a PUBLIC integration event of the {{.Mod.Human}} module: other modules
+// may subscribe to it (archgen subscribe <module> {{.Mod.Pkg}}.{{.Name}}).
+// Its payload is a contract: add fields freely, but never remove or change them;
+// create {{.NameSnake}}.v2 instead.
+//
+// Publish it atomically with your change, from a command handler, before saving:
+//
+//	agg.Record(contract.{{.Name}}Event.New(ctx, contract.{{.Name}}{...}, ddd.ForAggregate(agg.ID(), "...")))
+//	return repo.Save(ctx, agg) // written to the outbox in the same transaction
+type {{.Name}} struct {
+{{- range .Fields}}
+	{{.Name}} {{.GoType}} `json:"{{.JSON}}{{if .Optional}},omitempty{{end}}"`
+{{- end}}
+}
+
+// {{.Name}}Event declares the event type.
+var {{.Name}}Event = ddd.DefineEvent[{{.Name}}]("{{.Mod.Snake}}.{{.NameSnake}}.v1")
