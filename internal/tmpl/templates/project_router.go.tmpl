@@ -1,0 +1,36 @@
+package app
+
+import (
+	"net/http"
+
+	"{{.Kit}}/httpx"
+	"{{.Kit}}/lifecycle"
+	"{{.Kit}}/resilience"
+
+	"{{.Module}}/internal/shared/observability"
+)
+
+func newRouter(p *Platform, ms *Modules, lc *lifecycle.Manager) http.Handler {
+	m := p.Errors
+	r := httpx.NewRouter(m)
+	r.Use(
+		httpx.RequestContext(httpx.RequestContextOptions{}),
+		httpx.Recover(m),
+		httpx.AccessLog(p.Logger),
+		httpx.SecurityHeaders(p.Config.Env == "production"),
+	)
+	if len(p.Config.CORSOrigins) > 0 {
+		r.Use(httpx.CORS(httpx.CORSOptions{Origins: p.Config.CORSOrigins}))
+	}
+	httpx.RegisterHealth(r, "/health", observability.NewHealth(p.DB), lc.IsShuttingDown)
+
+	api := r.Group("{{.APIPrefix}}",
+		httpx.Timeout(p.Config.RequestTimeout),
+		httpx.MaxBody(1<<20),
+		httpx.RateLimit(&resilience.TokenBucket{Capacity: 100, Refill: 100, Interval: 1e9}, m, nil),
+		// Optional: anonymous calls reach the mediator, which rejects permissioned requests.
+		httpx.Authenticate(p.Tokens, m, httpx.AuthOptions{Optional: true, RBAC: p.RBAC}),
+	)
+	ms.registerRoutes(api)
+	return r
+}

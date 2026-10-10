@@ -1,0 +1,9 @@
+module {{.Module}}
+
+go {{.GoVersion}}
+
+require {{.Kit}} v0.0.0
+{{- if .KitReplace}}
+
+replace {{.Kit}} => {{.KitReplace}}
+{{- end}}

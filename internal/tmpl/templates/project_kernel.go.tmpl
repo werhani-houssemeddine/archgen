@@ -1,0 +1,11 @@
+// Package kernel is the minimal shared kernel: technical primitives every module may
+// use. It must never contain business concepts (no shared User, Course, Order...).
+package kernel
+
+import "{{.Kit}}/ids"
+
+// NewID returns a new time-ordered identifier (UUIDv7).
+func NewID() string { return ids.NewV7().String() }
+
+// IsID reports whether s is a valid identifier.
+func IsID(s string) bool { return ids.IsValid(s) }

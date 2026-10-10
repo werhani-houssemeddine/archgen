@@ -1,0 +1,19 @@
+// Package logging configures the structured logger.
+package logging
+
+import (
+	"log/slog"
+
+	"{{.Kit}}/logx"
+)
+
+// New returns a JSON logger in production-like environments and a text logger in development.
+func New(env, level, service string) *slog.Logger {
+	var lvl slog.Level
+	_ = lvl.UnmarshalText([]byte(level))
+	format := "json"
+	if env == "development" {
+		format = "text"
+	}
+	return logx.New(logx.Options{Level: lvl, Format: format, Attrs: []slog.Attr{slog.String("service", service), slog.String("env", env)}})
+}

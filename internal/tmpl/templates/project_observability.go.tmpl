@@ -1,0 +1,12 @@
+// Package observability exposes health checks (and is the place for metrics/tracing setup).
+package observability
+
+import (
+	"{{.Kit}}/lifecycle"
+	"{{.Kit}}/pg"
+)
+
+// NewHealth registers dependency checks used by /health/ready.
+func NewHealth(db *pg.DB) *lifecycle.Health {
+	return (&lifecycle.Health{}).Register(db.HealthCheck("postgres"))
+}

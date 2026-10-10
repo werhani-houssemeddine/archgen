@@ -1,0 +1,18 @@
+// Package http holds technical HTTP helpers shared by module interfaces.
+package http
+
+import (
+	"log/slog"
+
+	"{{.Kit}}/httpx"
+)
+
+// IDResponse is returned by create endpoints.
+type IDResponse struct {
+	ID string `json:"id"`
+}
+
+// NewErrorMapper returns the problem+json error mapper used by every module.
+func NewErrorMapper(log *slog.Logger, exposeInternals bool) *httpx.ErrorMapper {
+	return &httpx.ErrorMapper{Logger: log, Expose: exposeInternals}
+}

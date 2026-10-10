@@ -1,0 +1,76 @@
+package app
+
+import (
+	"log/slog"
+
+	"{{.Kit}}/app"
+	"{{.Kit}}/authz"
+	"{{.Kit}}/clock"
+	"{{.Kit}}/cqrs"
+	"{{.Kit}}/events"
+	"{{.Kit}}/httpx"
+	"{{.Kit}}/pg"
+	"{{.Kit}}/resilience"
+	"{{.Kit}}/security/jwtauth"
+
+	sharedhttp "{{.Module}}/internal/shared/http"
+)
+
+// Platform holds the shared technical services injected into modules.
+type Platform struct {
+	Config   Config
+	Logger   *slog.Logger
+	DB       *pg.DB
+	Outbox   *pg.Outbox
+	Bus      *events.Bus
+	Mediator *cqrs.Mediator
+	Clock    clock.Clock
+	Tokens   *jwtauth.Service
+	RBAC     *authz.RBAC
+	Errors   *httpx.ErrorMapper
+}
+
+func newPlatform(cfg Config, log *slog.Logger, db *pg.DB) (*Platform, error) {
+	tokens, err := jwtauth.New(jwtauth.Options{Secret: []byte(cfg.JWTSecret), Issuer: cfg.JWTIssuer, Audience: []string{cfg.JWTAudience}})
+	if err != nil {
+		return nil, err
+	}
+	rbac, err := authz.NewRBAC(Roles)
+	if err != nil {
+		return nil, err
+	}
+	return &Platform{
+		Config: cfg,
+		Logger: log,
+		DB:     db,
+		Outbox: pg.NewOutbox(db, ""),
+		Bus:    events.NewBus(events.Options{Logger: log, Retry: &resilience.RetryPolicy{Retries: 3}}),
+		// Every command/query passes through the same pipeline.
+		Mediator: cqrs.New(cqrs.Recover(), cqrs.Logging(log), cqrs.Authorization(), cqrs.Validation(), cqrs.Transaction(db)),
+		Clock:    clock.Default,
+		Tokens:   tokens,
+		RBAC:     rbac,
+		Errors:   sharedhttp.NewErrorMapper(log, cfg.Env == "development"),
+	}, nil
+}
+
+// Modules holds every business module. archgen inserts new modules at the markers.
+type Modules struct {
+	// archgen:module-fields
+}
+
+// buildModules wires the modules. Pass cross-module contracts explicitly, e.g.
+// enrollments.Deps{Users: ms.Users.UserReader()}: build providers before consumers.
+func buildModules(p *Platform) *Modules {
+	ms := &Modules{}
+	// archgen:module-wire
+	return ms
+}
+
+func (ms *Modules) registerRoutes(api *httpx.Group) {
+	// archgen:module-routes
+}
+
+func (ms *Modules) subscribe(bus app.EventSubscriber) {
+	// archgen:module-subscriptions
+}

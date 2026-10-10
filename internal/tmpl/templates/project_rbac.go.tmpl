@@ -1,0 +1,12 @@
+package app
+
+import "{{.Kit}}/authz"
+
+// Roles maps roles (carried in JWT "roles" claims) to permissions ("resource:action",
+// wildcards allowed). Generated commands/queries declare permissions such as
+// "courses:create" and "courses:read".
+var Roles = map[string]authz.Role{
+	"viewer": {Permissions: []string{"*:read"}},
+	"editor": {Permissions: []string{"*:read", "*:create", "*:update"}, Inherits: []string{"viewer"}},
+	"admin":  {Permissions: []string{"*"}},
+}

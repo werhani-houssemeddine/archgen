@@ -1,0 +1,31 @@
+package app
+
+import (
+	"time"
+
+	"{{.Kit}}/config"
+)
+
+// Config is the whole application configuration, loaded once from the environment.
+// Add module settings here and pass them explicitly to the modules that need them.
+type Config struct {
+	Env             string        `env:"APP_ENV" default:"development" oneof:"development,test,staging,production"`
+	HTTPAddr        string        `env:"HTTP_ADDR" default:":8080"`
+	LogLevel        string        `env:"LOG_LEVEL" default:"info" oneof:"debug,info,warn,error"`
+	DatabaseURL     string        `env:"DATABASE_URL" required:"true" url:"postgres,postgresql" secret:"true"`
+	DBMaxConns      int           `env:"DB_MAX_CONNS" default:"20" min:"1"`
+	AutoMigrate     bool          `env:"AUTO_MIGRATE" default:"true"`
+	JWTSecret       string        `env:"JWT_SECRET" required:"true" min:"32" secret:"true"`
+	JWTIssuer       string        `env:"JWT_ISSUER" default:"{{.AppName}}"`
+	JWTAudience     string        `env:"JWT_AUDIENCE" default:"{{.AppName}}-api"`
+	RequestTimeout  time.Duration `env:"HTTP_REQUEST_TIMEOUT" default:"15s"`
+	ShutdownTimeout time.Duration `env:"SHUTDOWN_TIMEOUT" default:"25s"`
+	CORSOrigins     []string      `env:"CORS_ORIGINS"`
+}
+
+// LoadConfig reads and validates the configuration (every problem is reported at once).
+func LoadConfig() (Config, error) {
+	var c Config
+	err := config.Load(&c)
+	return c, err
+}

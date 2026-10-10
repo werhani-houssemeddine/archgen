@@ -1,0 +1,74 @@
+// Package app is the composition root: it builds the dependency graph, wires the
+// modules and runs the HTTP server. It is the only package that knows every concrete
+// implementation.
+package app
+
+import (
+	"context"
+	"errors"
+	"log/slog"
+	"net/http"
+	"time"
+
+	"{{.Kit}}/config"
+	"{{.Kit}}/lifecycle"
+	"{{.Kit}}/logx"
+	"{{.Kit}}/pg"
+
+	"{{.Module}}/internal/shared/database"
+	"{{.Module}}/internal/shared/logging"
+	"{{.Module}}/migrations"
+)
+
+// Run starts the application and blocks until SIGINT/SIGTERM, then shuts down gracefully.
+func Run(ctx context.Context) error {
+	cfg, err := LoadConfig()
+	if err != nil {
+		return err
+	}
+	log := logging.New(cfg.Env, cfg.LogLevel, "{{.AppName}}")
+	log.Info("starting", slog.Any("config", config.Describe(cfg)))
+
+	db, err := database.Open(ctx, cfg.DatabaseURL, cfg.DBMaxConns, log)
+	if err != nil {
+		return err
+	}
+	if cfg.AutoMigrate {
+		if err := database.Migrate(ctx, db, migrations.FS, log); err != nil {
+			return err
+		}
+	}
+
+	platform, err := newPlatform(cfg, log, db)
+	if err != nil {
+		return err
+	}
+	modules := buildModules(platform)
+	modules.subscribe(platform.Bus)
+
+	relay := pg.NewRelay(db, platform.Bus, pg.RelayOptions{Logger: log})
+	relay.Start(ctx)
+
+	lc := lifecycle.NewManager(log)
+	lc.Timeout = cfg.ShutdownTimeout
+	router := newRouter(platform, modules, lc)
+
+	srv := &http.Server{
+		Addr:              cfg.HTTPAddr,
+		Handler:           router,
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+	go func() {
+		log.Info("http server listening", slog.String("addr", cfg.HTTPAddr))
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Error("http server failed", logx.Err(err))
+		}
+	}()
+
+	lc.OnShutdown("http", 10, srv.Shutdown)
+	lc.OnShutdown("outbox-relay", 20, relay.Stop)
+	lc.OnShutdown("event-bus", 30, func(context.Context) error { platform.Bus.Drain(); return nil })
+	lc.OnShutdown("database", 90, func(context.Context) error { return db.Close() })
+	return lc.Wait(ctx)
+}

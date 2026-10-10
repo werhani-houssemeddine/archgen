@@ -1,0 +1,6 @@
+APP_ENV=development
+HTTP_ADDR=:8080
+LOG_LEVEL=debug
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/{{.AppName}}?sslmode=disable
+JWT_SECRET=change-me-to-a-random-secret-of-at-least-32-bytes
+AUTO_MIGRATE=true

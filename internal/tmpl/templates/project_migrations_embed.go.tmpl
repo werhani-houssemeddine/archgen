@@ -1,0 +1,10 @@
+// Package migrations embeds the SQL migrations applied at startup (or by CI).
+// Files are named <version>_<description>.sql and applied in lexical order.
+package migrations
+
+import "embed"
+
+// FS contains every migration file.
+//
+//go:embed *.sql
+var FS embed.FS

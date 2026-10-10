@@ -1,0 +1,54 @@
+# {{.AppName}}
+
+Go **modular monolith** following **Clean Architecture**, built on [archkit]({{.Kit}}) and scaffolded with `archgen`.
+
+## Run
+
+```bash
+cp .env.example .env
+make db-up        # PostgreSQL in Docker
+make run          # migrations are applied at startup (AUTO_MIGRATE=true)
+curl localhost:8080/health/ready
+```
+
+## Structure
+
+```text
+cmd/api/main.go                 entry point
+internal/app/                   composition root (bootstrap, dependencies, router, RBAC)
+internal/modules/<module>/
+    domain/                     aggregates, value objects, domain events, errors, repository ports
+    application/commands/       write use cases
+    application/queries/        read use cases
+    application/ports/          interfaces the use cases need (implemented in infrastructure)
+    infrastructure/persistence/ PostgreSQL (and in-memory) repositories
+    interfaces/http/            HTTP adapters → commands/queries
+    contract/                   the module's PUBLIC API (the only package other modules may import)
+    module.go                   wires the module's layers
+internal/shared/                technical code only (kernel, database, http, logging, observability)
+migrations/                     SQL migrations (each module owns a PostgreSQL schema)
+```
+
+## Generate code
+
+```bash
+archgen module courses
+archgen resource courses Course --fields "title:string:unique, summary:text:optional, level:enum(beginner|advanced), price:float, published:bool"
+archgen command courses PublishCourse --fields "courseId:uuid"
+archgen query courses CountCourses
+archgen event users UserRegistered --fields "userId:uuid, email:email" --public
+archgen subscribe enrollments users.UserRegistered
+archgen contract users UserReader --resource User
+archgen use enrollments users.UserReader      # inject that contract into enrollments
+archgen port users PasswordHasher
+archgen migration courses add_course_tags
+archgen check           # enforce the architecture rules
+```
+
+## Rules (enforced by `archgen check`)
+
+- The domain imports no infrastructure: no HTTP, SQL, drivers, or archkit infrastructure packages.
+- The application layer never imports infrastructure or interfaces.
+- The interfaces layer never imports infrastructure.
+- A module imports another module **only** through `<module>/contract`.
+- `internal/shared` never imports business modules.

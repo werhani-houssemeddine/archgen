@@ -1,0 +1,31 @@
+.PHONY: run build test vet lint check migrate-new tidy db-up db-down
+
+-include .env
+export
+
+run:
+	go run ./cmd/api
+
+build:
+	go build -o bin/api ./cmd/api
+
+test:
+	go test -race -count=1 ./...
+
+vet:
+	go vet ./...
+
+# Architecture rules (layer dependencies, module boundaries)
+check:
+	archgen check
+
+lint: vet check
+
+tidy:
+	go mod tidy
+
+db-up:
+	docker compose up -d postgres
+
+db-down:
+	docker compose down

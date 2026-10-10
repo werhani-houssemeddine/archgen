@@ -1,0 +1,17 @@
+// Command api starts the {{.AppName}} HTTP API.
+package main
+
+import (
+	"context"
+	"log/slog"
+	"os"
+
+	"{{.Module}}/internal/app"
+)
+
+func main() {
+	if err := app.Run(context.Background()); err != nil {
+		slog.Error("application stopped with error", "err", err)
+		os.Exit(1)
+	}
+}
