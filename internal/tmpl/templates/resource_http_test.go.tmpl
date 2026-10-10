@@ -1,0 +1,85 @@
+{{- $r := .Res}}package http_test
+
+import (
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	"{{.Kit}}/clock"
+	"{{.Kit}}/cqrs"
+	"{{.Kit}}/httpx"
+
+	"{{.ModuleImport .Mod.Pkg "application" "commands"}}"
+	"{{.ModuleImport .Mod.Pkg "application" "queries"}}"
+	"{{.ModuleImport .Mod.Pkg "infrastructure" "persistence"}}"
+	modhttp "{{.ModuleImport .Mod.Pkg "interfaces" "http"}}"
+)
+
+func new{{$r.Name}}Server(t *testing.T) *httptest.Server {
+	t.Helper()
+	repo := persistence.NewMemory{{$r.Name}}Repository()
+	m := cqrs.New(cqrs.Validation()) // authorization is covered by the application pipeline
+	commands.Register{{$r.Name}}Handlers(m, repo, clock.NewFixed(time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)))
+	queries.Register{{$r.Name}}Handlers(m, repo)
+	r := httpx.NewRouter(nil)
+	modhttp.Register{{$r.Name}}Routes(r.Group("{{.APIPrefix}}"), m)
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func call{{$r.Name}}(t *testing.T, method, url, body string) (int, map[string]any) {
+	t.Helper()
+	req, _ := http.NewRequest(method, url, strings.NewReader(body))
+	if body != "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	raw, _ := io.ReadAll(res.Body)
+	var out map[string]any
+	_ = json.Unmarshal(raw, &out)
+	return res.StatusCode, out
+}
+
+func Test{{$r.Name}}Endpoints(t *testing.T) {
+	srv := new{{$r.Name}}Server(t)
+	base := srv.URL + "{{.APIPrefix}}/{{$r.PluralKebab}}"
+
+	status, created := call{{$r.Name}}(t, "POST", base, `{{$r.SampleJSONBody}}`)
+	if status != http.StatusCreated {
+		t.Fatalf("create: %d %v", status, created)
+	}
+	id, _ := created["id"].(string)
+
+	if status, body := call{{$r.Name}}(t, "GET", base+"/"+id, ""); status != http.StatusOK || body["id"] != id {
+		t.Fatalf("get: %d %v", status, body)
+	}
+	if status, body := call{{$r.Name}}(t, "GET", base+"?page=1&size=10&sort=-createdAt", ""); status != http.StatusOK || body["total"] != float64(1) {
+		t.Fatalf("list: %d %v", status, body)
+	}
+	if status, body := call{{$r.Name}}(t, "PUT", base+"/"+id, `{{$r.SampleJSONBody}}`); status != http.StatusOK || body["version"] != float64(2) {
+		t.Fatalf("update: %d %v", status, body)
+	}
+	if status, _ := call{{$r.Name}}(t, "DELETE", base+"/"+id, ""); status != http.StatusNoContent {
+		t.Fatalf("delete: %d", status)
+	}
+	if status, body := call{{$r.Name}}(t, "GET", base+"/"+id, ""); status != http.StatusNotFound || body["code"] != "{{upper $r.Snake}}_NOT_FOUND" {
+		t.Fatalf("get after delete: %d %v", status, body)
+	}
+	if status, _ := call{{$r.Name}}(t, "GET", base+"/not-a-uuid", ""); status != http.StatusBadRequest {
+		t.Fatalf("invalid id: %d", status)
+	}
+{{- if $r.HasRequired}}
+	if status, body := call{{$r.Name}}(t, "POST", base, `{}`); status != http.StatusBadRequest || body["errors"] == nil {
+		t.Fatalf("validation: %d %v", status, body)
+	}
+{{- end}}
+}

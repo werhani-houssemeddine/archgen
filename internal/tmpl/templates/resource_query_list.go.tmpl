@@ -1,0 +1,58 @@
+{{- $r := .Res}}package queries
+
+import (
+	"context"
+
+	ddd "{{.Kit}}/domain"
+	"{{.Kit}}/cqrs"
+
+	"{{.ModuleImport .Mod.Pkg "domain"}}"
+)
+
+// List{{$r.Plural}} returns a page of {{$r.PluralHuman}}.
+type List{{$r.Plural}} struct {
+	cqrs.Query
+	Search string
+	Page   int
+	Size   int
+	// Sort is "field,-otherField" using API names (see domain.{{$r.Name}}SortColumns).
+	Sort string
+}
+
+// Permissions required to execute the query.
+func (List{{$r.Plural}}) Permissions() []string { return []string{"{{$r.Perm}}:read"} }
+
+// List{{$r.Plural}}Handler handles List{{$r.Plural}}.
+type List{{$r.Plural}}Handler struct {
+	repo domain.{{$r.Name}}Repository
+}
+
+// NewList{{$r.Plural}}Handler builds the handler.
+func NewList{{$r.Plural}}Handler(repo domain.{{$r.Name}}Repository) *List{{$r.Plural}}Handler {
+	return &List{{$r.Plural}}Handler{repo: repo}
+}
+
+// Handle returns one page (default: newest first, 20 per page, max 100).
+func (h *List{{$r.Plural}}Handler) Handle(ctx context.Context, q List{{$r.Plural}}) (ddd.Page[{{$r.Name}}View], error) {
+	keys := make([]string, 0, len(domain.{{$r.Name}}SortColumns))
+	for k := range domain.{{$r.Name}}SortColumns {
+		keys = append(keys, k)
+	}
+	sort, err := ddd.ParseSort(q.Sort, keys...)
+	if err != nil {
+		return ddd.Page[{{$r.Name}}View]{}, err
+	}
+	for i := range sort {
+		sort[i].Field = domain.{{$r.Name}}SortColumns[sort[i].Field]
+	}
+	if len(sort) == 0 {
+		sort = []ddd.SortOrder{{"{{"}}Field: "created_at", Desc: true{{"}}"}}
+	}
+	req := ddd.NewPageRequest(q.Page, q.Size, 20, 100)
+	req.Sort = sort
+	page, err := h.repo.List(ctx, domain.{{$r.Name}}Filter{Search: q.Search, Page: req})
+	if err != nil {
+		return ddd.Page[{{$r.Name}}View]{}, err
+	}
+	return ddd.MapPage(page, New{{$r.Name}}View), nil
+}

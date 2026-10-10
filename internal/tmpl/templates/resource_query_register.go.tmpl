@@ -1,0 +1,13 @@
+{{- $r := .Res}}package queries
+
+import (
+	"{{.Kit}}/cqrs"
+
+	"{{.ModuleImport .Mod.Pkg "domain"}}"
+)
+
+// Register{{$r.Name}}Handlers registers the {{$r.Human}} query handlers on the mediator.
+func Register{{$r.Name}}Handlers(m *cqrs.Mediator, repo domain.{{$r.Name}}Repository) {
+	cqrs.Handle(m, NewGet{{$r.Name}}Handler(repo).Handle)
+	cqrs.Handle(m, NewList{{$r.Plural}}Handler(repo).Handle)
+}

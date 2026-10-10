@@ -1,0 +1,15 @@
+{{- $r := .Res}}package commands
+
+import (
+	"{{.Kit}}/clock"
+	"{{.Kit}}/cqrs"
+
+	"{{.ModuleImport .Mod.Pkg "domain"}}"
+)
+
+// Register{{$r.Name}}Handlers registers the {{$r.Human}} command handlers on the mediator.
+func Register{{$r.Name}}Handlers(m *cqrs.Mediator, repo domain.{{$r.Name}}Repository, clk clock.Clock) {
+	cqrs.Handle(m, NewCreate{{$r.Name}}Handler(repo, clk).Handle)
+	cqrs.Handle(m, NewUpdate{{$r.Name}}Handler(repo, clk).Handle)
+	cqrs.Handle(m, NewDelete{{$r.Name}}Handler(repo).Handle)
+}

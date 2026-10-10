@@ -1,0 +1,11 @@
+{{- $r := .Res}}package domain
+
+import "{{.Kit}}/errs"
+
+// Business errors of the {{$r.Human}} aggregate. Codes are stable: clients rely on them.
+var (
+	Err{{$r.Name}}NotFound = errs.Define(errs.KindNotFound, "{{upper $r.Snake}}_NOT_FOUND", "{{$r.Human}} %s not found")
+{{- range $r.Unique}}
+	Err{{$r.Name}}{{.Name}}Taken = errs.Define(errs.KindConflict, "{{upper $r.Snake}}_{{upper .Snake}}_TAKEN", "a {{$r.Human}} with this {{human .Name}} already exists")
+{{- end}}
+)

@@ -1,0 +1,32 @@
+{{- $r := .Res}}package queries
+
+import (
+	"time"
+
+	"{{.ModuleImport .Mod.Pkg "domain"}}"
+)
+
+// {{$r.Name}}View is the read model returned by {{$r.Human}} queries.
+type {{$r.Name}}View struct {
+	ID string `json:"id"`
+{{- range $r.Fields}}
+	{{.Name}} {{.GoType}} `json:"{{.JSON}}{{if .Optional}},omitempty{{end}}"`
+{{- end}}
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+	Version   int       `json:"version"`
+}
+
+// New{{$r.Name}}View maps the aggregate to its view.
+func New{{$r.Name}}View({{$r.Camel}} *domain.{{$r.Name}}) {{$r.Name}}View {
+	s := {{$r.Camel}}.Snapshot()
+	return {{$r.Name}}View{
+		ID: s.ID,
+{{- range $r.Fields}}
+		{{.Name}}: s.{{.Name}},
+{{- end}}
+		CreatedAt: s.CreatedAt,
+		UpdatedAt: s.UpdatedAt,
+		Version:   s.Version,
+	}
+}

@@ -1,0 +1,45 @@
+{{- $r := .Res}}package queries
+
+import (
+	"context"
+
+	"{{.Kit}}/cqrs"
+	"{{.Kit}}/validate"
+
+	"{{.ModuleImport .Mod.Pkg "domain"}}"
+)
+
+// Get{{$r.Name}} returns one {{$r.Human}}.
+type Get{{$r.Name}} struct {
+	cqrs.Query
+	ID string
+}
+
+// Permissions required to execute the query.
+func (Get{{$r.Name}}) Permissions() []string { return []string{"{{$r.Perm}}:read"} }
+
+// Validate checks the query.
+func (q Get{{$r.Name}}) Validate() error {
+	v := validate.New()
+	v.String("id", q.ID).Required().UUID()
+	return v.Err()
+}
+
+// Get{{$r.Name}}Handler handles Get{{$r.Name}}.
+type Get{{$r.Name}}Handler struct {
+	repo domain.{{$r.Name}}Repository
+}
+
+// NewGet{{$r.Name}}Handler builds the handler.
+func NewGet{{$r.Name}}Handler(repo domain.{{$r.Name}}Repository) *Get{{$r.Name}}Handler {
+	return &Get{{$r.Name}}Handler{repo: repo}
+}
+
+// Handle returns the {{$r.Human}} view.
+func (h *Get{{$r.Name}}Handler) Handle(ctx context.Context, q Get{{$r.Name}}) ({{$r.Name}}View, error) {
+	{{$r.Camel}}, err := h.repo.Get(ctx, q.ID)
+	if err != nil {
+		return {{$r.Name}}View{}, err
+	}
+	return New{{$r.Name}}View({{$r.Camel}}), nil
+}

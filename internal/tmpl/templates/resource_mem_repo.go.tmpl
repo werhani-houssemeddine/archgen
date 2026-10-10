@@ -1,0 +1,113 @@
+{{- $r := .Res}}package persistence
+
+import (
+	"context"
+	"sort"
+	"strings"
+	"sync"
+
+	ddd "{{.Kit}}/domain"
+	"{{.Kit}}/errs"
+
+	"{{.ModuleImport .Mod.Pkg "domain"}}"
+)
+
+// Memory{{$r.Name}}Repository is an in-memory implementation for tests and local
+// prototyping. It stores snapshots (not pointers) and enforces optimistic locking like
+// the PostgreSQL implementation.
+type Memory{{$r.Name}}Repository struct {
+	mu     sync.Mutex
+	rows   map[string]domain.{{$r.Name}}Snapshot
+	events []ddd.Event
+}
+
+var _ domain.{{$r.Name}}Repository = (*Memory{{$r.Name}}Repository)(nil)
+
+// NewMemory{{$r.Name}}Repository returns an empty repository.
+func NewMemory{{$r.Name}}Repository() *Memory{{$r.Name}}Repository {
+	return &Memory{{$r.Name}}Repository{rows: map[string]domain.{{$r.Name}}Snapshot{}}
+}
+
+// Get implements domain.{{$r.Name}}Repository.
+func (r *Memory{{$r.Name}}Repository) Get(_ context.Context, id string) (*domain.{{$r.Name}}, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	s, ok := r.rows[id]
+	if !ok {
+		return nil, domain.Err{{$r.Name}}NotFound.Newf(id)
+	}
+	return domain.Restore{{$r.Name}}(s), nil
+}
+
+// Save implements domain.{{$r.Name}}Repository.
+func (r *Memory{{$r.Name}}Repository) Save(_ context.Context, {{$r.Camel}} *domain.{{$r.Name}}) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	current, exists := r.rows[{{$r.Camel}}.ID()]
+	if (exists && current.Version != {{$r.Camel}}.Version()) || (!exists && {{$r.Camel}}.Version() != 0) {
+		return errs.ConcurrentModification("{{$r.Name}}", {{$r.Camel}}.ID())
+	}
+	{{$r.Camel}}.MarkPersisted({{$r.Camel}}.Version() + 1)
+	r.rows[{{$r.Camel}}.ID()] = {{$r.Camel}}.Snapshot()
+	r.events = append(r.events, {{$r.Camel}}.PullEvents()...)
+	return nil
+}
+
+// Delete implements domain.{{$r.Name}}Repository.
+func (r *Memory{{$r.Name}}Repository) Delete(_ context.Context, {{$r.Camel}} *domain.{{$r.Name}}) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.rows, {{$r.Camel}}.ID())
+	r.events = append(r.events, {{$r.Camel}}.PullEvents()...)
+	return nil
+}
+
+// List implements domain.{{$r.Name}}Repository (search, then default newest-first order).
+func (r *Memory{{$r.Name}}Repository) List(_ context.Context, f domain.{{$r.Name}}Filter) (ddd.Page[*domain.{{$r.Name}}], error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var all []domain.{{$r.Name}}Snapshot
+	needle := strings.ToLower(f.Search)
+	for _, s := range r.rows {
+		if needle == "" || matches{{$r.Name}}(s, needle) {
+			all = append(all, s)
+		}
+	}
+	sort.Slice(all, func(i, j int) bool { return all[i].CreatedAt.After(all[j].CreatedAt) })
+	req := f.Page
+	if req.Page < 1 {
+		req.Page = 1
+	}
+	if req.Size < 1 {
+		req.Size = 20
+	}
+	start := min(req.Offset(), len(all))
+	end := min(start+req.Size, len(all))
+	items := make([]*domain.{{$r.Name}}, 0, end-start)
+	for _, s := range all[start:end] {
+		items = append(items, domain.Restore{{$r.Name}}(s))
+	}
+	return ddd.NewPage(items, len(all), req), nil
+}
+
+// Events returns the domain events dispatched so far (for assertions).
+func (r *Memory{{$r.Name}}Repository) Events() []ddd.Event {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]ddd.Event(nil), r.events...)
+}
+
+func matches{{$r.Name}}(s domain.{{$r.Name}}Snapshot, needle string) bool {
+{{- range $r.Searchable}}
+{{- if .Optional}}
+	if s.{{.Name}} != nil && strings.Contains(strings.ToLower(*s.{{.Name}}), needle) {
+		return true
+	}
+{{- else}}
+	if strings.Contains(strings.ToLower(s.{{.Name}}), needle) {
+		return true
+	}
+{{- end}}
+{{- end}}
+	return false
+}

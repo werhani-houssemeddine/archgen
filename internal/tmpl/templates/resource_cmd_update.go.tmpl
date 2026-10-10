@@ -1,0 +1,58 @@
+{{- $r := .Res}}package commands
+
+import (
+	"context"
+	"time"
+
+	"{{.Kit}}/clock"
+	"{{.Kit}}/validate"
+
+	"{{.ModuleImport .Mod.Pkg "domain"}}"
+)
+
+// Update{{$r.Name}} replaces the attributes of a {{$r.Human}}.
+type Update{{$r.Name}} struct {
+	ID string
+{{- range $r.Fields}}
+	{{.Name}} {{.GoType}}
+{{- end}}
+}
+
+// Permissions required to execute the command.
+func (Update{{$r.Name}}) Permissions() []string { return []string{"{{$r.Perm}}:update"} }
+
+// Validate checks the command envelope (business rules are enforced by the aggregate).
+func (c Update{{$r.Name}}) Validate() error {
+	v := validate.New()
+	v.String("id", c.ID).Required().UUID()
+	return v.Err()
+}
+
+// Update{{$r.Name}}Handler handles Update{{$r.Name}}.
+type Update{{$r.Name}}Handler struct {
+	repo  domain.{{$r.Name}}Repository
+	clock clock.Clock
+}
+
+// NewUpdate{{$r.Name}}Handler builds the handler.
+func NewUpdate{{$r.Name}}Handler(repo domain.{{$r.Name}}Repository, clk clock.Clock) *Update{{$r.Name}}Handler {
+	return &Update{{$r.Name}}Handler{repo: repo, clock: clk}
+}
+
+// Handle loads, changes and saves the {{$r.Human}}.
+func (h *Update{{$r.Name}}Handler) Handle(ctx context.Context, cmd Update{{$r.Name}}) (struct{}, error) {
+	{{$r.Camel}}, err := h.repo.Get(ctx, cmd.ID)
+	if err != nil {
+		return struct{}{}, err
+	}
+	err = {{$r.Camel}}.Update(ctx, domain.{{$r.Name}}Params{
+{{- range $r.Fields}}
+		{{.Name}}: cmd.{{.Name}},
+{{- end}}
+	}, h.clock.Now())
+	if err != nil {
+		return struct{}{}, err
+	}
+	return struct{}{}, h.repo.Save(ctx, {{$r.Camel}})
+}
+

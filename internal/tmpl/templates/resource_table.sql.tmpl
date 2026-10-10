@@ -1,0 +1,18 @@
+{{- $r := .Res}}-- {{$r.Name}} aggregate of the {{.Mod.Human}} module.
+CREATE TABLE IF NOT EXISTS {{$r.Table}} (
+    id uuid PRIMARY KEY,
+{{- range $r.Fields}}
+    {{.SQLColumn}},
+{{- end}}
+    created_at timestamptz NOT NULL,
+    updated_at timestamptz NOT NULL,
+    version integer NOT NULL
+{{- range $r.Unique}},
+    CONSTRAINT {{$r.PluralSnake}}_{{.Snake}}_key UNIQUE ({{.Snake}})
+{{- end}}
+);
+
+CREATE INDEX IF NOT EXISTS {{$r.PluralSnake}}_created_at_idx ON {{$r.Table}} (created_at);
+{{- range $r.Indexed}}
+CREATE INDEX IF NOT EXISTS {{$r.PluralSnake}}_{{.Snake}}_idx ON {{$r.Table}} ({{.Snake}});
+{{- end}}

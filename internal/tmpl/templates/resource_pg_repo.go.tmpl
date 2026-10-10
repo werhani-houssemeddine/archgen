@@ -1,0 +1,103 @@
+{{- $r := .Res}}package persistence
+
+import (
+	"context"
+	"errors"
+
+	ddd "{{.Kit}}/domain"
+	"{{.Kit}}/errs"
+	"{{.Kit}}/pg"
+
+	"{{.ModuleImport .Mod.Pkg "domain"}}"
+)
+
+// Postgres{{$r.Name}}Repository stores {{$r.PluralHuman}} in {{$r.Table}}.
+type Postgres{{$r.Name}}Repository struct {
+	repo *pg.Repository[*domain.{{$r.Name}}, string]
+}
+
+var _ domain.{{$r.Name}}Repository = (*Postgres{{$r.Name}}Repository)(nil)
+
+// NewPostgres{{$r.Name}}Repository builds the repository; domain events are written to
+// the outbox in the same transaction as the row.
+func NewPostgres{{$r.Name}}Repository(db *pg.DB, outbox *pg.Outbox) *Postgres{{$r.Name}}Repository {
+	return &Postgres{{$r.Name}}Repository{repo: pg.NewRepository(db, pg.Mapping[*domain.{{$r.Name}}, string]{
+		Table:         "{{$r.Table}}",
+		Resource:      "{{$r.Name}}",
+		VersionColumn: "version",
+		Columns:       []string{"id", {{range $r.Fields}}"{{.Snake}}", {{end}}"created_at", "updated_at", "version"},
+		Scan:          scan{{$r.Name}},
+		Values:        {{$r.Camel}}Values,
+		ID:            func({{$r.Camel}} *domain.{{$r.Name}}) string { return {{$r.Camel}}.ID() },
+	}, pg.WithOutbox(outbox))}
+}
+
+func scan{{$r.Name}}(row pg.Scanner) (*domain.{{$r.Name}}, error) {
+	var s domain.{{$r.Name}}Snapshot
+	if err := row.Scan(&s.ID, {{range $r.Fields}}&s.{{.Name}}, {{end}}&s.CreatedAt, &s.UpdatedAt, &s.Version); err != nil {
+		return nil, err
+	}
+	return domain.Restore{{$r.Name}}(s), nil
+}
+
+func {{$r.Camel}}Values({{$r.Camel}} *domain.{{$r.Name}}) map[string]any {
+	s := {{$r.Camel}}.Snapshot()
+	return map[string]any{
+		"id": s.ID,
+{{- range $r.Fields}}
+		"{{.Snake}}": s.{{.Name}},
+{{- end}}
+		"created_at": s.CreatedAt,
+		"updated_at": s.UpdatedAt,
+	}
+}
+
+// Get implements domain.{{$r.Name}}Repository.
+func (r *Postgres{{$r.Name}}Repository) Get(ctx context.Context, id string) (*domain.{{$r.Name}}, error) {
+	{{$r.Camel}}, err := r.repo.Get(ctx, id)
+	if errors.Is(err, errs.NotFound) {
+		return nil, domain.Err{{$r.Name}}NotFound.Newf(id)
+	}
+	return {{$r.Camel}}, err
+}
+
+// Save implements domain.{{$r.Name}}Repository.
+func (r *Postgres{{$r.Name}}Repository) Save(ctx context.Context, {{$r.Camel}} *domain.{{$r.Name}}) error {
+	return translate{{$r.Name}}Error(r.repo.Save(ctx, {{$r.Camel}}))
+}
+
+// Delete implements domain.{{$r.Name}}Repository.
+func (r *Postgres{{$r.Name}}Repository) Delete(ctx context.Context, {{$r.Camel}} *domain.{{$r.Name}}) error {
+	return r.repo.Delete(ctx, {{$r.Camel}})
+}
+
+// List implements domain.{{$r.Name}}Repository.
+func (r *Postgres{{$r.Name}}Repository) List(ctx context.Context, f domain.{{$r.Name}}Filter) (ddd.Page[*domain.{{$r.Name}}], error) {
+	return r.repo.Paginate(ctx, f.Page, func(q *pg.SelectBuilder) {
+{{- if $r.Searchable}}
+		if f.Search != "" {
+			pattern := "%" + pg.EscapeLike(f.Search) + "%"
+			q.Group(func(w *pg.Where) {
+{{- range $r.Searchable}}
+				w.Or("{{.Snake}}", "ILIKE", pattern)
+{{- end}}
+			})
+		}
+{{- end}}
+	})
+}
+
+// translate{{$r.Name}}Error maps unique-constraint violations to domain errors.
+func translate{{$r.Name}}Error(err error) error {
+	e, ok := errs.As(err)
+	if !ok || e.Code != "DUPLICATE" {
+		return err
+	}
+	switch e.Meta["constraint"] {
+{{- range $r.Unique}}
+	case "{{$r.PluralSnake}}_{{.Snake}}_key":
+		return domain.Err{{$r.Name}}{{.Name}}Taken.Wrap(err)
+{{- end}}
+	}
+	return err
+}

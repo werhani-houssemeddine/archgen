@@ -1,0 +1,33 @@
+{{- $r := .Res}}package domain
+
+import (
+	"context"
+
+	ddd "{{.Kit}}/domain"
+)
+
+// {{$r.Name}}Repository is the persistence port of the {{$r.Human}} aggregate,
+// implemented in infrastructure/persistence.
+type {{$r.Name}}Repository interface {
+	// Get returns Err{{$r.Name}}NotFound when missing.
+	Get(ctx context.Context, id string) (*{{$r.Name}}, error)
+	// Save inserts or updates; concurrent modifications are rejected (optimistic locking).
+	Save(ctx context.Context, {{$r.Camel}} *{{$r.Name}}) error
+	Delete(ctx context.Context, {{$r.Camel}} *{{$r.Name}}) error
+	List(ctx context.Context, f {{$r.Name}}Filter) (ddd.Page[*{{$r.Name}}], error)
+}
+
+// {{$r.Name}}Filter selects {{$r.PluralHuman}}.
+type {{$r.Name}}Filter struct {
+	Search string
+	Page   ddd.PageRequest // Sort fields are column names (see {{$r.Name}}SortColumns)
+}
+
+// {{$r.Name}}SortColumns maps API sort keys to columns.
+var {{$r.Name}}SortColumns = map[string]string{
+	"createdAt": "created_at",
+	"updatedAt": "updated_at",
+{{- range $r.Sortable}}
+	"{{.JSON}}": "{{.Snake}}",
+{{- end}}
+}

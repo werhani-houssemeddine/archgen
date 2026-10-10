@@ -1,0 +1,55 @@
+{{- $r := .Res}}package commands_test
+
+import (
+	"context"
+	"errors"
+	"testing"
+	"time"
+
+	"{{.Kit}}/clock"
+	"{{.Kit}}/errs"
+
+	"{{.ModuleImport .Mod.Pkg "application" "commands"}}"
+	"{{.ModuleImport .Mod.Pkg "domain"}}"
+	"{{.ModuleImport .Mod.Pkg "infrastructure" "persistence"}}"
+)
+
+func Test{{$r.Name}}Lifecycle(t *testing.T) {
+	ctx := context.Background()
+	repo := persistence.NewMemory{{$r.Name}}Repository()
+	clk := clock.NewFixed(time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC))
+
+	id, err := commands.NewCreate{{$r.Name}}Handler(repo, clk).Handle(ctx, commands.Create{{$r.Name}}{
+{{- range $r.Fields}}{{if not .Optional}}
+		{{.Name}}: {{.SampleValue}},{{end}}{{end}}
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if _, err := repo.Get(ctx, id); err != nil {
+		t.Fatalf("created {{$r.Human}} not found: %v", err)
+	}
+
+	clk.Advance(time.Minute)
+	_, err = commands.NewUpdate{{$r.Name}}Handler(repo, clk).Handle(ctx, commands.Update{{$r.Name}}{
+		ID: id,
+{{- range $r.Fields}}{{if not .Optional}}
+		{{.Name}}: {{.SampleValue}},{{end}}{{end}}
+	})
+	if err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	if got, _ := repo.Get(ctx, id); got.Version() != 2 || !got.UpdatedAt().Equal(clk.Now()) {
+		t.Fatalf("update not persisted: %+v", got.Snapshot())
+	}
+
+	if _, err := commands.NewDelete{{$r.Name}}Handler(repo).Handle(ctx, commands.Delete{{$r.Name}}{ID: id}); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	if _, err := repo.Get(ctx, id); !errors.Is(err, domain.Err{{$r.Name}}NotFound) || !errors.Is(err, errs.NotFound) {
+		t.Fatalf("expected not found after delete, got %v", err)
+	}
+	if n := len(repo.Events()); n != 3 {
+		t.Fatalf("expected created/updated/deleted events, got %d", n)
+	}
+}

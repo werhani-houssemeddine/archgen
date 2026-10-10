@@ -1,0 +1,27 @@
+{{- $r := .Res}}package domain
+
+import ddd "{{.Kit}}/domain"
+
+// Domain events of the {{$r.Human}} aggregate. They are internal to the {{.Mod.Human}}
+// module; to notify other modules, declare an integration event in the contract package
+// (archgen event {{.Mod.Pkg}} <Name> --public).
+type (
+	// {{$r.Name}}Created is recorded when a {{$r.Human}} is created.
+	{{$r.Name}}Created struct {
+		ID string `json:"id"`
+	}
+	// {{$r.Name}}Updated is recorded when a {{$r.Human}} changes.
+	{{$r.Name}}Updated struct {
+		ID string `json:"id"`
+	}
+	// {{$r.Name}}Deleted is recorded when a {{$r.Human}} is deleted.
+	{{$r.Name}}Deleted struct {
+		ID string `json:"id"`
+	}
+)
+
+var (
+	{{$r.Name}}CreatedEvent = ddd.DefineEvent[{{$r.Name}}Created]("{{.Mod.Snake}}.{{$r.Snake}}_created.v1")
+	{{$r.Name}}UpdatedEvent = ddd.DefineEvent[{{$r.Name}}Updated]("{{.Mod.Snake}}.{{$r.Snake}}_updated.v1")
+	{{$r.Name}}DeletedEvent = ddd.DefineEvent[{{$r.Name}}Deleted]("{{.Mod.Snake}}.{{$r.Snake}}_deleted.v1")
+)

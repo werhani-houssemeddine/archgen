@@ -1,0 +1,123 @@
+{{- $r := .Res}}{{$rv := receiver $r.Name}}package domain
+
+import (
+	"context"
+	"time"
+
+	ddd "{{.Kit}}/domain"
+	"{{.Kit}}/validate"
+
+	"{{.Module}}/internal/shared/kernel"
+)
+
+// {{$r.Name}} is the {{$r.Human}} aggregate root. Fields are unexported: state only
+// changes through methods that enforce invariants and record domain events.
+//
+// archgen:aggregate
+type {{$r.Name}} struct {
+	ddd.AggregateRoot
+	id string
+{{- range $r.Fields}}
+	{{.Camel}} {{.GoType}}
+{{- end}}
+	createdAt time.Time
+	updatedAt time.Time
+}
+
+// {{$r.Name}}Params carries the attributes used to create or update a {{$r.Human}}.
+type {{$r.Name}}Params struct {
+{{- range $r.Fields}}
+	{{.Name}} {{.GoType}}
+{{- end}}
+}
+
+// validate enforces the {{$r.Human}} invariants. Add business rules here.
+func (p {{$r.Name}}Params) validate() error {
+	v := validate.New()
+{{- range $r.Fields}}{{with .ValidateLine (printf "p.%s" .Name)}}
+	{{.}}{{end}}{{end}}
+	return v.Err()
+}
+
+// New{{$r.Name}} creates a {{$r.Human}}.
+func New{{$r.Name}}(ctx context.Context, p {{$r.Name}}Params, now time.Time) (*{{$r.Name}}, error) {
+	if err := p.validate(); err != nil {
+		return nil, err
+	}
+	{{$rv}} := &{{$r.Name}}{id: kernel.NewID(), createdAt: now, updatedAt: now}
+	{{$rv}}.apply(p)
+	{{$rv}}.Record({{$r.Name}}CreatedEvent.New(ctx, {{$r.Name}}Created{ID: {{$rv}}.id}, ddd.ForAggregate({{$rv}}.id, "{{$r.Name}}")))
+	return {{$rv}}, nil
+}
+
+// Update changes the {{$r.Human}} attributes.
+func ({{$rv}} *{{$r.Name}}) Update(ctx context.Context, p {{$r.Name}}Params, now time.Time) error {
+	if err := p.validate(); err != nil {
+		return err
+	}
+	{{$rv}}.apply(p)
+	{{$rv}}.updatedAt = now
+	{{$rv}}.Record({{$r.Name}}UpdatedEvent.New(ctx, {{$r.Name}}Updated{ID: {{$rv}}.id}, ddd.ForAggregate({{$rv}}.id, "{{$r.Name}}")))
+	return nil
+}
+
+// MarkDeleted records the deletion (call before removing it from the repository).
+func ({{$rv}} *{{$r.Name}}) MarkDeleted(ctx context.Context) {
+	{{$rv}}.Record({{$r.Name}}DeletedEvent.New(ctx, {{$r.Name}}Deleted{ID: {{$rv}}.id}, ddd.ForAggregate({{$rv}}.id, "{{$r.Name}}")))
+}
+
+func ({{$rv}} *{{$r.Name}}) apply(p {{$r.Name}}Params) {
+{{- range $r.Fields}}
+	{{$rv}}.{{.Camel}} = p.{{.Name}}
+{{- end}}
+}
+
+// ID returns the identifier.
+func ({{$rv}} *{{$r.Name}}) ID() string { return {{$rv}}.id }
+{{range $r.Fields}}
+// {{.Name}} returns the {{human .Name}}.
+func ({{$rv}} *{{$r.Name}}) {{.Name}}() {{.GoType}} { return {{$rv}}.{{.Camel}} }
+{{end}}
+// CreatedAt returns the creation time.
+func ({{$rv}} *{{$r.Name}}) CreatedAt() time.Time { return {{$rv}}.createdAt }
+
+// UpdatedAt returns the last modification time.
+func ({{$rv}} *{{$r.Name}}) UpdatedAt() time.Time { return {{$rv}}.updatedAt }
+
+// {{$r.Name}}Snapshot is the persisted state, used only by repositories.
+type {{$r.Name}}Snapshot struct {
+	ID string
+{{- range $r.Fields}}
+	{{.Name}} {{.GoType}}
+{{- end}}
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	Version   int
+}
+
+// Snapshot exports the state for persistence.
+func ({{$rv}} *{{$r.Name}}) Snapshot() {{$r.Name}}Snapshot {
+	return {{$r.Name}}Snapshot{
+		ID: {{$rv}}.id,
+{{- range $r.Fields}}
+		{{.Name}}: {{$rv}}.{{.Camel}},
+{{- end}}
+		CreatedAt: {{$rv}}.createdAt,
+		UpdatedAt: {{$rv}}.updatedAt,
+		Version:   {{$rv}}.Version(),
+	}
+}
+
+// Restore{{$r.Name}} rebuilds a {{$r.Human}} from persisted state (no events recorded).
+func Restore{{$r.Name}}(s {{$r.Name}}Snapshot) *{{$r.Name}} {
+	{{$rv}} := &{{$r.Name}}{
+		id: s.ID,
+{{- range $r.Fields}}
+		{{.Camel}}: s.{{.Name}},
+{{- end}}
+		createdAt: s.CreatedAt,
+		updatedAt: s.UpdatedAt,
+	}
+	{{$rv}}.Restore(s.Version)
+	return {{$rv}}
+}

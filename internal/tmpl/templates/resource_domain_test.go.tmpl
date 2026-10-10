@@ -1,0 +1,56 @@
+{{- $r := .Res}}package domain_test
+
+import (
+	"context"
+	"errors"
+	"testing"
+	"time"
+
+	"{{.Kit}}/errs"
+
+	"{{.ModuleImport .Mod.Pkg "domain"}}"
+)
+
+func valid{{$r.Name}}Params() domain.{{$r.Name}}Params {
+	return domain.{{$r.Name}}Params{
+{{- range $r.Fields}}{{if not .Optional}}
+		{{.Name}}: {{.SampleValue}},{{end}}{{end}}
+	}
+}
+
+func TestNew{{$r.Name}}(t *testing.T) {
+	now := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	{{$r.Camel}}, err := domain.New{{$r.Name}}(context.Background(), valid{{$r.Name}}Params(), now)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if {{$r.Camel}}.ID() == "" || !{{$r.Camel}}.CreatedAt().Equal(now) {
+		t.Fatalf("unexpected state: %+v", {{$r.Camel}}.Snapshot())
+	}
+	if evs := {{$r.Camel}}.PendingEvents(); len(evs) != 1 || evs[0].Type != domain.{{$r.Name}}CreatedEvent.Type {
+		t.Fatalf("expected a %s event, got %+v", domain.{{$r.Name}}CreatedEvent.Type, evs)
+	}
+}
+{{if $r.HasRequired}}
+func TestNew{{$r.Name}}RejectsInvalidInput(t *testing.T) {
+	_, err := domain.New{{$r.Name}}(context.Background(), domain.{{$r.Name}}Params{}, time.Now())
+	if !errors.Is(err, errs.Validation) {
+		t.Fatalf("expected a validation error, got %v", err)
+	}
+}
+{{end}}
+func Test{{$r.Name}}UpdateAndRestore(t *testing.T) {
+	ctx := context.Background()
+	{{$r.Camel}}, _ := domain.New{{$r.Name}}(ctx, valid{{$r.Name}}Params(), time.Now())
+	later := time.Now().Add(time.Hour)
+	if err := {{$r.Camel}}.Update(ctx, valid{{$r.Name}}Params(), later); err != nil {
+		t.Fatal(err)
+	}
+	if !{{$r.Camel}}.UpdatedAt().Equal(later) || len({{$r.Camel}}.PendingEvents()) != 2 {
+		t.Fatal("update must change updatedAt and record an event")
+	}
+	restored := domain.Restore{{$r.Name}}({{$r.Camel}}.Snapshot())
+	if restored.ID() != {{$r.Camel}}.ID() || len(restored.PendingEvents()) != 0 {
+		t.Fatal("restore must rebuild state without events")
+	}
+}

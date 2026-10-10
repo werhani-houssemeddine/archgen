@@ -1,0 +1,44 @@
+{{- $r := .Res}}package commands
+
+import (
+	"context"
+
+	"{{.Kit}}/validate"
+
+	"{{.ModuleImport .Mod.Pkg "domain"}}"
+)
+
+// Delete{{$r.Name}} deletes a {{$r.Human}}.
+type Delete{{$r.Name}} struct {
+	ID string
+}
+
+// Permissions required to execute the command.
+func (Delete{{$r.Name}}) Permissions() []string { return []string{"{{$r.Perm}}:delete"} }
+
+// Validate checks the command.
+func (c Delete{{$r.Name}}) Validate() error {
+	v := validate.New()
+	v.String("id", c.ID).Required().UUID()
+	return v.Err()
+}
+
+// Delete{{$r.Name}}Handler handles Delete{{$r.Name}}.
+type Delete{{$r.Name}}Handler struct {
+	repo domain.{{$r.Name}}Repository
+}
+
+// NewDelete{{$r.Name}}Handler builds the handler.
+func NewDelete{{$r.Name}}Handler(repo domain.{{$r.Name}}Repository) *Delete{{$r.Name}}Handler {
+	return &Delete{{$r.Name}}Handler{repo: repo}
+}
+
+// Handle deletes the {{$r.Human}}.
+func (h *Delete{{$r.Name}}Handler) Handle(ctx context.Context, cmd Delete{{$r.Name}}) (struct{}, error) {
+	{{$r.Camel}}, err := h.repo.Get(ctx, cmd.ID)
+	if err != nil {
+		return struct{}{}, err
+	}
+	{{$r.Camel}}.MarkDeleted(ctx)
+	return struct{}{}, h.repo.Delete(ctx, {{$r.Camel}})
+}

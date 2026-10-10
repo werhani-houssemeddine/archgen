@@ -1,0 +1,83 @@
+{{- $r := .Res}}package http
+
+import (
+	"context"
+	"time"
+
+	ddd "{{.Kit}}/domain"
+	"{{.Kit}}/cqrs"
+	"{{.Kit}}/httpx"
+
+	"{{.ModuleImport .Mod.Pkg "application" "commands"}}"
+	"{{.ModuleImport .Mod.Pkg "application" "queries"}}"
+	sharedhttp "{{.Module}}/internal/shared/http"
+)
+
+// Create{{$r.Name}}Request is the body of POST /{{$r.PluralKebab}}.
+type Create{{$r.Name}}Request struct {
+{{- range $r.Fields}}
+	{{.Name}} {{.GoType}} `json:"{{.JSON}}"`
+{{- end}}
+}
+
+// Update{{$r.Name}}Request is the body of PUT /{{$r.PluralKebab}}/{id}.
+type Update{{$r.Name}}Request struct {
+	ID string `path:"id"`
+{{- range $r.Fields}}
+	{{.Name}} {{.GoType}} `json:"{{.JSON}}"`
+{{- end}}
+}
+
+// {{$r.Name}}IDRequest addresses one {{$r.Human}}.
+type {{$r.Name}}IDRequest struct {
+	ID string `path:"id"`
+}
+
+// List{{$r.Plural}}Request holds list query parameters.
+type List{{$r.Plural}}Request struct {
+	Search string `query:"search"`
+	Page   int    `query:"page"`
+	Size   int    `query:"size"`
+	Sort   string `query:"sort"`
+}
+
+// Register{{$r.Name}}Routes mounts the {{$r.Human}} endpoints.
+func Register{{$r.Name}}Routes(g *httpx.Group, m *cqrs.Mediator) {
+	httpx.Handle(g, "POST /{{$r.PluralKebab}}", func(ctx context.Context, in Create{{$r.Name}}Request) (httpx.Result[sharedhttp.IDResponse], error) {
+		id, err := cqrs.Send[string](ctx, m, commands.Create{{$r.Name}}{
+{{- range $r.Fields}}
+			{{.Name}}: in.{{.Name}},
+{{- end}}
+		})
+		if err != nil {
+			return httpx.Result[sharedhttp.IDResponse]{}, err
+		}
+		return httpx.Created(sharedhttp.IDResponse{ID: id}, "{{.APIPrefix}}/{{$r.PluralKebab}}/"+id), nil
+	})
+
+	httpx.Handle(g, "GET /{{$r.PluralKebab}}", func(ctx context.Context, in List{{$r.Plural}}Request) (ddd.Page[queries.{{$r.Name}}View], error) {
+		return cqrs.Send[ddd.Page[queries.{{$r.Name}}View]](ctx, m, queries.List{{$r.Plural}}{Search: in.Search, Page: in.Page, Size: in.Size, Sort: in.Sort})
+	})
+
+	httpx.Handle(g, "GET /{{$r.PluralKebab}}/{id}", func(ctx context.Context, in {{$r.Name}}IDRequest) (queries.{{$r.Name}}View, error) {
+		return cqrs.Send[queries.{{$r.Name}}View](ctx, m, queries.Get{{$r.Name}}{ID: in.ID})
+	})
+
+	httpx.Handle(g, "PUT /{{$r.PluralKebab}}/{id}", func(ctx context.Context, in Update{{$r.Name}}Request) (queries.{{$r.Name}}View, error) {
+		err := cqrs.Exec(ctx, m, commands.Update{{$r.Name}}{
+			ID: in.ID,
+{{- range $r.Fields}}
+			{{.Name}}: in.{{.Name}},
+{{- end}}
+		})
+		if err != nil {
+			return queries.{{$r.Name}}View{}, err
+		}
+		return cqrs.Send[queries.{{$r.Name}}View](ctx, m, queries.Get{{$r.Name}}{ID: in.ID})
+	})
+
+	httpx.Handle(g, "DELETE /{{$r.PluralKebab}}/{id}", func(ctx context.Context, in {{$r.Name}}IDRequest) (httpx.Empty, error) {
+		return httpx.Empty{}, cqrs.Exec(ctx, m, commands.Delete{{$r.Name}}{ID: in.ID})
+	})
+}
+

@@ -1,0 +1,48 @@
+{{- $r := .Res}}package commands
+
+import (
+	"context"
+	"time"
+
+	"{{.Kit}}/clock"
+
+	"{{.ModuleImport .Mod.Pkg "domain"}}"
+)
+
+// Create{{$r.Name}} creates a {{$r.Human}}.
+type Create{{$r.Name}} struct {
+{{- range $r.Fields}}
+	{{.Name}} {{.GoType}}
+{{- end}}
+}
+
+// Permissions required to execute the command (enforced by the mediator).
+func (Create{{$r.Name}}) Permissions() []string { return []string{"{{$r.Perm}}:create"} }
+
+// Create{{$r.Name}}Handler handles Create{{$r.Name}}.
+type Create{{$r.Name}}Handler struct {
+	repo  domain.{{$r.Name}}Repository
+	clock clock.Clock
+}
+
+// NewCreate{{$r.Name}}Handler builds the handler.
+func NewCreate{{$r.Name}}Handler(repo domain.{{$r.Name}}Repository, clk clock.Clock) *Create{{$r.Name}}Handler {
+	return &Create{{$r.Name}}Handler{repo: repo, clock: clk}
+}
+
+// Handle creates the {{$r.Human}} and returns its id.
+func (h *Create{{$r.Name}}Handler) Handle(ctx context.Context, cmd Create{{$r.Name}}) (string, error) {
+	{{$r.Camel}}, err := domain.New{{$r.Name}}(ctx, domain.{{$r.Name}}Params{
+{{- range $r.Fields}}
+		{{.Name}}: cmd.{{.Name}},
+{{- end}}
+	}, h.clock.Now())
+	if err != nil {
+		return "", err
+	}
+	if err := h.repo.Save(ctx, {{$r.Camel}}); err != nil {
+		return "", err
+	}
+	return {{$r.Camel}}.ID(), nil
+}
+
