@@ -1,0 +1,55 @@
+// Package {{.Mod.Pkg}} is the composition root of the {{.Mod.Human}} module. It wires the
+// module's layers and exposes its public API through the contract package.
+//
+// Other modules must depend only on {{.ModuleImport .Mod.Pkg "contract"}}.
+package {{.Mod.Pkg}}
+
+import (
+	"log/slog"
+
+	"{{.Kit}}/app"
+	"{{.Kit}}/clock"
+	"{{.Kit}}/cqrs"
+	"{{.Kit}}/httpx"
+	"{{.Kit}}/pg"
+)
+
+// Deps are injected by the application composition root (internal/app).
+// The module never opens connections or reads configuration itself.
+type Deps struct {
+	DB       *pg.DB
+	Outbox   *pg.Outbox
+	Mediator *cqrs.Mediator
+	Clock    clock.Clock
+	Logger   *slog.Logger
+	// Contracts of other modules this module needs go here.
+	// archgen:deps
+}
+
+// Module is the {{.Mod.Human}} module.
+type Module struct {
+	deps Deps
+	// archgen:fields
+}
+
+// New wires the module's repositories, use cases and adapters.
+func New(d Deps) *Module {
+	m := &Module{deps: d}
+	// archgen:wire
+	return m
+}
+
+// Name returns the module name.
+func (m *Module) Name() string { return "{{.Mod.Snake}}" }
+
+// RegisterRoutes mounts the module's HTTP endpoints.
+func (m *Module) RegisterRoutes(g *httpx.Group) {
+	// archgen:routes
+}
+
+// Subscribe registers the module's event handlers.
+func (m *Module) Subscribe(bus app.EventSubscriber) {
+	// archgen:subscriptions
+}
+
+// archgen:contract-accessors
